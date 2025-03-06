@@ -1,15 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
+import { DATABASE_URL } from "./env.js";
 import Task from "./models/Task.js";
 
-//mongoose.connect(DATABASE_URL).then(() => console.log("Connected to DB"));
-// const mongoose = require('mongoose');
-const url = 'mongodb://localhost:27017/myDatabase';
-
-mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB Connection failed:', err));
-
+mongoose.connect(DATABASE_URL).then(() => console.log("Connected to DB!!"));
 
 const app = express();
 app.use(express.json()); // parsing: json -> js obj
@@ -24,20 +18,20 @@ adding error handling to handler function => (async (req, res) => {...})
 500: server error
 */
 function asyncHandler(handler) {
-    return async function (req, res) {
-        try {
-            await handler(req, res)
-        } catch(e) {
-            if (e.name === 'ValidationError') {
-                res.status(400).send({message: e.message})
-            } else if (e.name === 'CastError') {
-                res.status(404).send({message: "cannot find given id."})
-            } else {
-                res.status(500).send({message: e.message})
-            }
-        }
+  return async function (req, res) {
+    try {
+      await handler(req, res);
+    } catch (e) {
+      if (e.name === "ValidationError") {
+        res.status(400).send({ message: e.message });
+      } else if (e.name === "CastError") {
+        res.status(404).send({ message: "cannot find given id." });
+      } else {
+        res.status(500).send({ message: e.message });
+      }
     }
-} 
+  };
+}
 
 app.get("/hi", (req, res) => {
   res.send("hi");
@@ -57,10 +51,10 @@ app.get("/tasks", async (req, res) => {
      https://mongoosejs.com/docs/api/query.html 조건 
     */
   const sort = req.query.sort;
-  const count = Number(req.query.count) || 0
-  const sortOption = {createdAt: sort === 'oldest' ? 'asc': 'desc'}
-  
-  const tasks = await Task.find().sort(sortOption).limit(count) // all data meeting conditions
+  const count = Number(req.query.count) || 0;
+  const sortOption = { createdAt: sort === "oldest" ? "asc" : "desc" };
+
+  const tasks = await Task.find().sort(sortOption).limit(count); // all data meeting conditions
 
   res.send(tasks);
 });
@@ -82,38 +76,41 @@ app.get("/tasks/:id", async (req, res) => {
 });
 
 app.post("/tasks", async (req, res) => {
-    /*
+  /*
     validation is added in the models schema
     when validation doesn't pass, server will die.
     비동기 오류 async error 
     We need a logic for error handling so server will keep connected
     */
-  const newTask = await Task.crate(req.body)
+  const newTask = await Task.create(req.body);
   res.status(201).send(newTask);
 });
 
 app.patch("/tasks/:id", async (req, res) => {
-    const id = req.params.id;
-    const task = await Task.findById(id);
+  const id = req.params.id;
+  const task = await Task.findById(id);
   if (task) {
     Object.keys(req.body).forEach((key) => {
       task[key] = req.body[key];
     });
-    await task.save() // save to mongoDB
+    await task.save(); // save to mongoDB
     res.send(task);
   } else {
     res.status(404).send({ message: "cannot find given id." });
   }
 });
 
-app.delete("/tasks/:id", asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
-  const task = await Task.findByIdAndDelete(id)
-  if (task) {
-    res.sendStatus(204);
-  } else {
-    res.status(404).send({ message: "cannot find given id." });
-  }
-}));
+app.delete(
+  "/tasks/:id",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const task = await Task.findByIdAndDelete(id);
+    if (task) {
+      res.sendStatus(204);
+    } else {
+      res.status(404).send({ message: "cannot find given id." });
+    }
+  })
+);
 
 app.listen(3000, () => console.log("Server started."));
