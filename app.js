@@ -1,58 +1,79 @@
 import express from "express";
-import tasks from "./data/mock-express.js";
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+import Task from "./models/Task.js";
+
+//mongoose.connect(DATABASE_URL).then(() => console.log("Connected to DB"));
+// const mongoose = require('mongoose');
+const url = 'mongodb://localhost:27017/myDatabase';
+
+mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB Connection failed:', err));
 
 
-mongoose.connect(DATABASE_URL).then(() => console.log('Connected to DB'));
 const app = express();
-app.use(express.json());
-// parsing: json -> js obj
+app.use(express.json()); // parsing: json -> js obj
+
 /*
-  request content-type : application/json 일 때 
-   body 를 파싱해서 json 에서 js obj로 바꿔주고 request의 body property에 담아줌
- */
+try catch handler
+
+higher order function: getting func as arguments and returns function
+adding error handling to handler function => (async (req, res) => {...})  
+400: bad request by user
+404: page not found 
+500: server error
+*/
+function asyncHandler(handler) {
+    return async function (req, res) {
+        try {
+            await handler(req, res)
+        } catch(e) {
+            if (e.name === 'ValidationError') {
+                res.status(400).send({message: e.message})
+            } else if (e.name === 'CastError') {
+                res.status(404).send({message: "cannot find given id."})
+            } else {
+                res.status(500).send({message: e.message})
+            }
+        }
+    }
+} 
 
 app.get("/hi", (req, res) => {
   res.send("hi");
 });
-// get method, url, callback function
 
-app.get("/tasks", (req, res) => {
+app.get("/tasks", async (req, res) => {
   /*
     "res" takes arguments and converts js object to json
     Content-Type: application/json  
 
-    query parameter following '?' in the url
+    query parameter: following '?' in the url
      sort: oldest
      count: show how many 
+
+     mongoose는 데이터 찾기, await는 결과 받아옴 
+     https://mongoosejs.com/docs/queries.html 찾기
+     https://mongoosejs.com/docs/api/query.html 조건 
     */
-
   const sort = req.query.sort;
-  const count = Number(req.query.count); // string to number
-  // createdAt is Date object
-  const compareFn =
-    sort === "oldest"
-      ? (a, b) => a.createdAt - b.createdAt
-      : (a, b) => b.createdAt - a.createdAt;
+  const count = Number(req.query.count) || 0
+  const sortOption = {createdAt: sort === 'oldest' ? 'asc': 'desc'}
+  
+  const tasks = await Task.find().sort(sortOption).limit(count) // all data meeting conditions
 
-  let newTasks = tasks.sort(compareFn);
-  // tasks is mock-express.js data. objects in array.
-  if (count) {
-    newTasks = newTasks.slice(0, count);
-  }
-  // send the mock data as a response
-  res.send(newTasks);
+  res.send(tasks);
 });
 
 // dynamic property name -> :id (with colon)
-app.get("/tasks/:id", (req, res) => {
+app.get("/tasks/:id", async (req, res) => {
   /*
     url parameter passed as params object 
     default type is string but convert it to number
     find from tasks mock data that matches id 
   */
-  const id = Number(req.params.id);
-  const task = tasks.find((task) => task.id === id);
+  const id = req.params.id;
+  const task = await Task.findById(id);
   if (task) {
     res.send(task);
   } else {
@@ -60,53 +81,39 @@ app.get("/tasks/:id", (req, res) => {
   } // no matching id exists. status code and msg
 });
 
-app.post("/tasks", (req, res) => {
-  const newTask = req.body;
-  //app.use(express.json()) 을 이용해 js obj로 변경해줌
-  const ids = tasks.map((task) => task.id);
-  newTask.id = Math.max(...ids) + 1;
-  newTask.isComplete = false;
-  newTask.createdAt = new Date();
-  newTask.updatedAt = new Date();
-  tasks.push(newTask);
-  // add the created data
+app.post("/tasks", async (req, res) => {
+    /*
+    validation is added in the models schema
+    when validation doesn't pass, server will die.
+    비동기 오류 async error 
+    We need a logic for error handling so server will keep connected
+    */
+  const newTask = await Task.crate(req.body)
   res.status(201).send(newTask);
-  // as response, return 201 and show the updated data
 });
 
-app.patch("/tasks/:id", (req, res) => {
-  /*
-  grab a existing task
-  change the content of the task
- */
-  const id = Number(req.params.id);
-  const task = tasks.find((task) => task.id === id);
+app.patch("/tasks/:id", async (req, res) => {
+    const id = req.params.id;
+    const task = await Task.findById(id);
   if (task) {
     Object.keys(req.body).forEach((key) => {
       task[key] = req.body[key];
     });
-    task.updatedAt = new Date();
+    await task.save() // save to mongoDB
     res.send(task);
   } else {
     res.status(404).send({ message: "cannot find given id." });
   }
 });
 
-app.delete("/tasks/:id", (req, res) => {
+app.delete("/tasks/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  const idx = tasks.findIndex((task) => task.id === id);
-  if (idx >= 0) {
-    /*
-        delete one that match the index
-        successfully deleted, send only code 204 not body
-        */
-    tasks.splice(idx, 1);
+  const task = await Task.findByIdAndDelete(id)
+  if (task) {
     res.sendStatus(204);
   } else {
     res.status(404).send({ message: "cannot find given id." });
   }
-});
+}));
 
-// listen port 3000 process, once server starts, perform callback
-// localhost:3000/hello
 app.listen(3000, () => console.log("Server started."));

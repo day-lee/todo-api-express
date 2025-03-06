@@ -1,13 +1,11 @@
 const data = [
   {
-    id: 1,
     title: 'workout',
     isComplete: false,
     createdAt: new Date('2023-03-23T06:34:07.617Z'),
     updatedAt: new Date('2023-03-23T06:34:07.617Z'),
   },
   {
-    id: 2,
     title: 'study programming',
     description: 'Tic Tac Toe game',
     isComplete: true,
@@ -15,14 +13,12 @@ const data = [
     updatedAt: new Date('2023-03-23T06:34:08.617Z'),
   },
   {
-    id: 3,
     title: 'clean the house',
     isComplete: true,
     createdAt: new Date('2023-03-23T06:34:09.617Z'),
     updatedAt: new Date('2023-03-23T06:34:09.617Z'),
   },
   {
-    id: 4,
     title: 'read a book',
     description: 'Javascript the good parts',
     isComplete: false,
@@ -30,7 +26,6 @@ const data = [
     updatedAt: new Date('2023-03-23T06:34:10.617Z'),
   },
   {
-    id: 5,
     title: 'study python',
     description: 'free code camp',
     isComplete: false,
